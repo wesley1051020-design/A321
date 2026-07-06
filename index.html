@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飛機外艙門模擬器 (下壓開/上拉關)</title>
+    <style>
+        :root {
+            --bg-color: #1e272e;
+            --fuselage-color: #f1f2f6;
+            --door-border: #ced6e0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: white;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .subtitle {
+            color: #ced6e0;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .instructions {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 15px;
+            max-width: 450px;
+            line-height: 1.5;
+            border-left: 5px solid #2ed573;
+            min-height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 機身外框 */
+        .fuselage {
+            position: relative;
+            width: 460px;
+            height: 580px;
+            background: linear-gradient(135deg, #ffffff 0%, #e4e7eb 100%);
+            border-radius: 30px;
+            box-shadow: inset -10px -10px 20px rgba(0,0,0,0.1), 0 20px 40px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid #57606f;
+            overflow: visible; /* 讓艙門可以往左邊大角度開出框外 */
+        }
+
+        /* 機艙內部大洞 */
+        .cabin-inside {
+            position: absolute;
+            width: 240px;
+            height: 460px;
+            background: #0f141c;
+            border-radius: 40px;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #00d2d3;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: inset 5px 5px 30px rgba(0,0,0,1);
+        }
+
+        /* 艙門主體 */
+        .door {
+            position: absolute;
+            width: 240px;
+            height: 460px;
+            background: #f8f9fa;
+            border: 3px solid var(--door-border);
+            border-radius: 40px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            /* 轉軸定在最左側，達成向左開門的物理效果 */
+            transform-origin: left center;
+            transition: transform 1.2s cubic-bezier(0.25, 1, 0.3, 1), opacity 0.5s ease;
+            cursor: default;
+            z-index: 5;
+        }
+
+        /* 觀察窗 */
+        .window {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 65px;
+            height: 95px;
+            background: linear-gradient(180deg, #1b3a4b, #2e6f40);
+            border: 5px solid #bdc3c7;
+            border-radius: 30px;
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);
+        }
+
+        /* 直式把手凹槽 */
+        .handle-enclosure {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 160px;
+            background: #d1d8e0;
+            border: 2px solid #a5b1c2;
+            border-radius: 30px;
+            box-shadow: inset 3px 3px 6px rgba(0,0,0,0.2);
+        }
+
+        /* 直式把手 */
+        .handle-main {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%) rotate(0deg);
+            width: 24px;
+            height: 130px;
+            background: linear-gradient(to right, #dfe4ea, #a4b0be);
+            border: 1px solid #747d8c;
+            border-radius: 12px;
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
+            transform-origin: center 20px; /* 轉軸在上方 */
+            z-index: 6;
+        }
+        
+        /* 把手下方的提示箭頭 */
+        .handle-main::before {
+            content: "▼";
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            width: 18px;
+            height: 18px;
+            background: #ff4757;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 把手由上往下壓（開門狀態） */
+        .handle-main.pressed-down {
+            transform: translateX(-50%) rotate(100deg);
+            background: linear-gradient(to right, #ffa502, #ff7f50);
+        }
+
+        /* 門開時，把手維持在下方 */
+        .handle-main.ready-to-lock {
+            transform: translateX(-50%) rotate(100deg);
+        }
+
+        /* 向左完全大開：門以左側為軸心往左甩開 */
+        .fuselage.door-open .door {
+            transform: rotateY(-85deg) translate3d(-30px, 0, 80px);
+            box-shadow: -15px 15px 30px rgba(0,0,0,0.3);
+        }
+
+        /* 提示閃爍效果 */
+        .highlight {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(46, 213, 115, 0.7); }
+            70% { box-shadow: 0 0 0 12px rgba(46, 213, 115, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(46, 213, 115, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>飛機外艙門開關模擬器</h1>
+    <div class="subtitle">操作：由上往下壓開啟 ➔ 門往左開 ➔ 由下往上拉關閉</div>
+    
+    <div class="instructions" id="instruction-text">
+        【開啟步驟 1】點擊把手，將其【由上往下壓】解鎖艙門。
+    </div>
+
+    <div class="fuselage" id="fuselage">
+        <div class="cabin-inside">
+            <span>機艙內部已敞開</span>
+            <div id="cabin-status" style="font-size: 11px; color: #ff4757; margin-top: 8px; font-weight: normal;">READY FOR ENTRY</div>
+        </div>
+
+        <div class="door" id="door">
+            <div class="window"></div>
+            <div class="handle-enclosure">
+                <div class="handle-main" id="handle-main"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const handleMain = document.getElementById('handle-main');
+        const door = document.getElementById('door');
+        const fuselage = document.getElementById('fuselage');
+        const instructionText = document.getElementById('instruction-text');
+        const cabinStatus = document.getElementById('cabin-status');
+
+        let currentStatus = 'locked'; 
+
+        // 把手控制 (由上往下壓解鎖 / 由下往上拉鎖死)
+        handleMain.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            // 【開門】由上往下壓
+            if (currentStatus === 'locked') {
+                currentStatus = 'unlocked-down';
+                handleMain.classList.add('pressed-down');
+                instructionText.innerHTML = "【開啟步驟 2】已往下壓解鎖！點擊「整扇艙門」將其【往左邊推開】。";
+                door.style.cursor = 'pointer';
+                door.classList.add('highlight');
+            } 
+            // 【關門】由下往上拉
+            else if (currentStatus === 'door-pulled-back') {
+                currentStatus = 'locked';
+                handleMain.classList.remove('pressed-down', 'ready-to-lock');
+                handleMain.classList.remove('highlight');
+                instructionText.innerHTML = "🎉 艙門已【由下往上】拉起鎖緊！(可再次點擊把手重新體驗)";
+                cabinStatus.innerHTML = "DOOR LOCKED";
+                cabinStatus.style.color = "#2ed573";
+            }
+        });
+
+        // 艙門控制 (往左推開 與 拉回)
+        door.addEventListener('click', () => {
+            // 【開門】往左大開
+            if (currentStatus === 'unlocked-down') {
+                currentStatus = 'door-open';
+                fuselage.classList.add('door-open');
+                door.classList.remove('highlight');
+                instructionText.innerHTML = "✈️ 艙門已向左翻開！【準備關門】：點擊左側「艙門」將其拉回門框。";
+                cabinStatus.innerHTML = "DOOR OPEN";
+                cabinStatus.style.color = "#ffa502";
+            } 
+            // 【關門】拉回門框
+            else if (currentStatus === 'door-open') {
+                currentStatus = 'door-pulled-back';
+                fuselage.classList.remove('door-open');
+                handleMain.classList.add('ready-to-lock'); // 門回去了，把手還留在下方
+                instructionText.innerHTML = "【關門步驟 2】門已貼回！請點擊下方的把手【由下往上拉起】鎖死艙門！";
+                handleMain.classList.add('highlight');
+            }
+        });
+    </script>
+</body>
+</html>
